@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1
+
+# Используем версию 22.0.0 Node.js
+ARG NODE_VERSION=22.0.0
+ 
+# Используем образ Node.js из Docker Hub
+FROM node:${NODE_VERSION}-alpine
+
+ENV NODE_ENV=docker
+ 
+# Создаем директорию для приложения и устанавливаем ее рабочей
+WORKDIR /usr/src/app/server
+
+# Копируем package.json и package-lock.json
+COPY package.json .
+COPY package-lock.json .
+
+ 
+
+# Устанавливаем зависимости
+RUN npm i
+
+ 
+ 
+# Открываем порт 3000
+EXPOSE 3000
+
+ 

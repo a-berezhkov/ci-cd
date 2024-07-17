@@ -1,0 +1,68 @@
+name: Build and Deploy Express
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/express-app:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Pull Docker image
+        run: docker pull ${{ secrets.DOCKER_USERNAME }}/express-app:latest
+
+      - name: Run Docker container
+        run: |
+          docker run -d -p 80:80 --name express-app ${{ secrets.DOCKER_USERNAME }}/express-app:latest
+      - name: Deploy to remote server
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          script: |
+            docker pull ${{ secrets.DOCKER_USERNAME }}/express-app:latest
+            if [ "$(docker ps -q -f name=express-app)" ]; then
+              docker stop express-app
+            fi
+            if [ "$(docker ps -aq -f name=express-app)" ]; then
+              docker rm express-app
+            fi
+            docker run -d -p 80:80 \
+            -e PORT_PROD=${{ secrets.PORT_PROD }} \
+            -e DB_HOST_PROD=${{ secrets.DB_HOST_PROD }} \
+            -e DB_USER_PROD=${{ secrets.DB_USER_PROD }} \
+            -e DB_PASSWORD_PROD=${{ secrets.DB_PASSWORD_PROD }} \
+            -e DB_NAME_PROD=${{ secrets.DB_NAME_PROD }} \
+            -e DB_DIALECT_PROD=${{ secrets.DB_DIALECT_PROD }} \
+            --name express-app ${{ secrets.DOCKER_USERNAME }}/express-app:latest

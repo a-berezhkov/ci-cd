@@ -1,0 +1,45 @@
+version: "3.8"
+services:
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.client.dev
+    restart: on-failure 
+    ports:
+      - 5173:5173
+    volumes:
+      - ./client:/usr/src/app/client # мап локальной папки на докер
+      - /usr/src/app/client/node_modules # анонимный том, который скрывает каталог node_modules внутри контейнера.
+    environment:
+      - NODE_ENV=docker
+  backend:
+    build: 
+      context: ./server
+      dockerfile: Dockerfile.server.dev              
+    restart: on-failure   # перезапускать контейнер при падении
+    env_file: "./server/.env"
+    ports:                          # открываем порты
+      - 3000:3000
+    depends_on:           # зависимости контейнера
+      - db_postgres
+    links:						 
+      - db_postgres
+    volumes:
+      - ./server:/usr/src/app/server # мап локальной папки на докер
+      - /usr/src/app/server/node_modules # # анонимный том, который скрывает каталог node_modules внутри контейнера.
+    environment:
+      - NODE_ENV=docker
+    command: >
+      sh -c "
+      npx sequelize db:drop &&
+      npx sequelize db:create &&
+      npx sequelize db:migrate &&
+      npx sequelize db:seed:all &&
+      npm run dev"
+  db_postgres: # Важно! Это же имя используется конфиге БД при подключении, как хост
+    image: postgres:16    # используемый образ
+    env_file: "./server/.env"
+    ports:                          # открываем порты
+      - 5432:5432
+    volumes:                        # пробрасываем папку с данными
+      - ./db/data:/var/lib/postgresql/data
